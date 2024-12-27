@@ -32,6 +32,7 @@ class Header:
     print_speed_bytes: bytes = b""
     hotbed_temperature_bytes: bytes = b""
     extruder_temp_bytes: bytes = b""
+    thumbnail_bytes: bytes = b""
 
     # assembled header, without BMP
     assembled_header: bytes = b""
@@ -46,6 +47,9 @@ class Header:
             "h", self.hotbed_temperature_degrees
         )
         self.extruder_temp_bytes: bytes = pack("h", self.extruder_temp_degrees)
+
+        with open("thumbnail.bmp", "rb") as f:
+            self.thumbnail_bytes = f.read()
 
         self.assembled_header = (
             self.MAGIC_BYTES
@@ -64,4 +68,5 @@ class Header:
             + self.extruder_temp_bytes
             + self.extruder_temp_bytes
             + self.UNDOCUMENTED_VALUE_2
+            + self.thumbnail_bytes
         )
