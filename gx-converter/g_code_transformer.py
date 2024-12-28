@@ -1,0 +1,148 @@
+from re import sub, RegexFlag, match
+
+
+class GCodeTransformer:
+    """Reading and preparation of g-code"""
+
+    @staticmethod
+    def convert(gcode: str) -> str:
+        """Modify g-code to match gx format
+
+        Returns:
+            Compatible g-code
+        """
+
+        gcode = GCodeTransformer._remove_initial_comments(gcode)
+        gcode = GCodeTransformer._insert_initialization_code(gcode)
+        gcode = GCodeTransformer._add_initial_comments(gcode)
+        gcode = GCodeTransformer._convert_absolute_positioning(gcode)
+        gcode = GCodeTransformer._add_break_and_continue(gcode)
+        gcode = GCodeTransformer._turn_fans_on_early(gcode)
+        gcode = GCodeTransformer._remove_extra_footer(gcode)
+
+        return gcode
+
+    @staticmethod
+    def _turn_fans_on_early(gcode):
+        """Turn fans on at the beginning, instead of after the 1st layer
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+        gcode = sub("^M106.*\n", "", gcode, 1, RegexFlag.MULTILINE)
+        gcode = sub("^M107.*", "M106", gcode, 1, RegexFlag.MULTILINE)
+        return gcode
+
+    @staticmethod
+    def _add_break_and_continue(gcode):
+        """Add Break and Continue statement
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return sub("^G92 E0.*\n^G92 E0.*", "M108 T0", gcode, 1, RegexFlag.MULTILINE)
+
+    @staticmethod
+    def _convert_absolute_positioning(gcode):
+        """Use compatible absolute positioning
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return sub("^M82.*", "G90", gcode, 1, RegexFlag.MULTILINE)
+
+    @staticmethod
+    def _remove_initial_comments(gcode):
+        """Remove initial Cura comments and add gx-converter comment
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        while match("^;", gcode):
+            gcode = sub("^;.*\n", "", gcode)
+
+        return gcode
+
+    @staticmethod
+    def _add_initial_comments(gcode):
+        """Add gx-converter comment
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return ";created with gx-convert\n;github.com/bkienzle/gx-convert\n" + gcode
+
+    @staticmethod
+    def _insert_initialization_code(gcode):
+        """Add initialization code
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return "M118 X17.55 Y15.00 Z10.10 T0\n" + gcode
+
+    @staticmethod
+    def _remove_extra_footer(gcode):
+        """Remove extra information at EOF. Anything after M18 (Disable steppers) is extraneous.
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return sub("^M18.*", "M18", gcode, 1, RegexFlag.DOTALL | RegexFlag.MULTILINE)
+
+    # Header:
+
+    # ;test comment
+    # ;start gcode
+    # M118 X17.55 Y15.00 Z10.10 T0
+    # M140 S50 T0
+    # M104 S222 T0
+    # M104 S0 T1
+    # M107
+    # G90
+    # G28
+    # M132 X Y Z A B
+    # G1 Z50.000 F420
+    # G161 X Y F3300
+    # M7 T0
+    # M6 T0
+    # M651 S255
+
+    # Footer:
+
+    # ;end gcode
+    # M104 S0 T0
+    # M140 S0 T0
+    # G162 Z F1800
+    # G28 X Y
+    # M132 X Y A B
+    # M652
+    # G91
+    # M18
