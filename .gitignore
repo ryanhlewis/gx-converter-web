@@ -80,3 +80,6 @@ fabric.properties
 /.idea/modules.xml
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/vcs.xml
+
+# Misc
+scratch/
