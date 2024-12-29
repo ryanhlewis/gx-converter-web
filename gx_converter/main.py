@@ -1,15 +1,15 @@
 """main.py
 
-Main entry point for gx-converter. This script converts gcode created in Cura to a format that
+Main entry point for gx_converter. This script converts gcode created in Cura to a format that
 can be used with current firmware versions of FlashForge Adventurer 3 and Monoprice Voxel 3"""
 
 import argparse
 
 from pathlib import Path
 
-from g_code_property_extractor import GCodePropertyExtractor
-from g_code_transformer import GCodeTransformer
-from header import Header
+from .g_code_property_extractor import GCodePropertyExtractor
+from .g_code_transformer import GCodeTransformer
+from .header import Header
 
 
 def get_parser():

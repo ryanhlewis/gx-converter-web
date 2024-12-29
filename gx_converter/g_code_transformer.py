@@ -95,7 +95,7 @@ class GCodeTransformer:
 
     @staticmethod
     def _remove_initial_comments(gcode):
-        """Remove initial Cura comments and add gx-converter comment
+        """Remove initial Cura comments and add gx_converter comment
 
         Args:
             gcode: G-code to modify
@@ -111,7 +111,7 @@ class GCodeTransformer:
 
     @staticmethod
     def _add_initial_comments(gcode):
-        """Add gx-converter comment
+        """Add gx_converter comment
 
         Args:
             gcode: G-code to modify
