@@ -25,7 +25,7 @@ class GCodePropertyExtractor:
 
     @staticmethod
     def get_layer_height(gcode: str) -> int:
-        """Get layer height from g-code
+        """Get layer height in microns (µ) from g-code
 
         Args:
             gcode: original g-code
@@ -34,7 +34,8 @@ class GCodePropertyExtractor:
             Layer height
         """
 
-        return GCodePropertyExtractor._extract_comment_value("Layer height", gcode)
+        height = GCodePropertyExtractor._extract_comment_value("Layer height", gcode)
+        return height * 10
 
     @staticmethod
     def get_filament_usage(gcode: str) -> int:

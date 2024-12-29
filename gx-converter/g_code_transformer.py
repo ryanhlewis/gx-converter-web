@@ -1,8 +1,11 @@
-from re import sub, RegexFlag, match
+from re import sub, RegexFlag, match, search
 
 
 class GCodeTransformer:
     """Reading and preparation of g-code"""
+
+    BED_TEMPERATURE_COMMAND = "M140"
+    NOZZLE_TEMPERATURE_COMMAND = "M104"
 
     @staticmethod
     def convert(gcode: str) -> str:
@@ -16,6 +19,12 @@ class GCodeTransformer:
         gcode = GCodeTransformer._insert_initialization_code(gcode)
         gcode = GCodeTransformer._add_initial_comments(gcode)
         gcode = GCodeTransformer._convert_absolute_positioning(gcode)
+        gcode = GCodeTransformer._convert_temperature_commands(
+            gcode, GCodeTransformer.BED_TEMPERATURE_COMMAND
+        )
+        gcode = GCodeTransformer._convert_temperature_commands(
+            gcode, GCodeTransformer.NOZZLE_TEMPERATURE_COMMAND
+        )
         gcode = GCodeTransformer._add_break_and_continue(gcode)
         gcode = GCodeTransformer._turn_fans_on_early(gcode)
         gcode = GCodeTransformer._remove_extra_footer(gcode)
@@ -34,6 +43,28 @@ class GCodeTransformer:
         """
         gcode = sub("^M106.*\n", "", gcode, 1, RegexFlag.MULTILINE)
         gcode = sub("^M107.*", "M106", gcode, 1, RegexFlag.MULTILINE)
+        return gcode
+
+    @staticmethod
+    def _convert_temperature_commands(gcode, command: str) -> str:
+        """Add T0 to end of given command.
+
+        Args:
+            gcode: G-code to modify
+            command: Command to which T0 should be appended
+
+        Returns:
+            Converted g-code
+        """
+
+        result = search(f"^{command}.*", gcode, RegexFlag.MULTILINE)
+        if not result:
+            return gcode
+
+        result = result.group(0)
+        result = result.strip() + " T0\n"
+
+        gcode = sub(f"^{command}.*\n", result, gcode, 1, RegexFlag.MULTILINE)
         return gcode
 
     @staticmethod
@@ -116,33 +147,3 @@ class GCodeTransformer:
         """
 
         return sub("^M18.*", "M18", gcode, 1, RegexFlag.DOTALL | RegexFlag.MULTILINE)
-
-    # Header:
-
-    # ;test comment
-    # ;start gcode
-    # M118 X17.55 Y15.00 Z10.10 T0
-    # M140 S50 T0
-    # M104 S222 T0
-    # M104 S0 T1
-    # M107
-    # G90
-    # G28
-    # M132 X Y Z A B
-    # G1 Z50.000 F420
-    # G161 X Y F3300
-    # M7 T0
-    # M6 T0
-    # M651 S255
-
-    # Footer:
-
-    # ;end gcode
-    # M104 S0 T0
-    # M140 S0 T0
-    # G162 Z F1800
-    # G28 X Y
-    # M132 X Y A B
-    # M652
-    # G91
-    # M18

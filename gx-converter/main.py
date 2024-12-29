@@ -17,7 +17,13 @@ print_speed = 60
 code = GCodeTransformer.convert(code)
 
 header = Header(
-    print_time, filament_usage, layer_height, 1, print_speed, hotbed_temp, nozzle_temp
+    print_time,
+    filament_usage,
+    layer_height,
+    shell_count,
+    print_speed,
+    hotbed_temp,
+    nozzle_temp,
 )
 
 gx = header.assembled_header + code.encode("utf-8")
