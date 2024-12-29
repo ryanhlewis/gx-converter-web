@@ -1,5 +1,8 @@
+import importlib.resources
+
 from dataclasses import dataclass
 from struct import pack
+from pathlib import Path
 
 
 @dataclass
@@ -48,8 +51,10 @@ class Header:
         )
         self.extruder_temp_bytes: bytes = pack("h", self.extruder_temp_degrees)
 
-        with open("thumbnail.bmp", "rb") as f:
-            self.thumbnail_bytes = f.read()
+        thumbnail = importlib.resources.files("gx_converter").joinpath("thumbnail.bmp")
+        self.thumbnail_bytes = thumbnail.read_bytes()
+        # with open(Path(thumbnail), "rb") as f:
+        #     self.thumbnail_bytes = f.read()
 
         self.assembled_header = (
             self.MAGIC_BYTES

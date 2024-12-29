@@ -9,4 +9,6 @@ setup(
             "gx-converter=gx_converter.main:main",
         ],
     },
+    include_package_data=True,
+    python_requires=">=3.9",
 )
