@@ -16,7 +16,7 @@ class GCodeTransformer:
         """
 
         gcode = GCodeTransformer._remove_initial_comments(gcode)
-        gcode = GCodeTransformer._insert_initialization_code(gcode)
+        gcode = GCodeTransformer._insert_dimensions(gcode)
         gcode = GCodeTransformer._add_initial_comments(gcode)
         gcode = GCodeTransformer._convert_absolute_positioning(gcode)
         gcode = GCodeTransformer._convert_temperature_commands(
@@ -26,7 +26,8 @@ class GCodeTransformer:
             gcode, GCodeTransformer.NOZZLE_TEMPERATURE_COMMAND
         )
         gcode = GCodeTransformer._add_break_and_continue(gcode)
-        gcode = GCodeTransformer._turn_fans_on_early(gcode)
+        # gcode = GCodeTransformer._turn_fans_on_early(gcode)
+        gcode = GCodeTransformer._remove_inline_comments(gcode)
         gcode = GCodeTransformer._remove_extra_footer(gcode)
 
         return gcode
@@ -94,6 +95,19 @@ class GCodeTransformer:
         return sub("^M82.*", "G90", gcode, 1, RegexFlag.MULTILINE)
 
     @staticmethod
+    def _remove_inline_comments(gcode):
+        """Commands with inline comments are ignored entirely by the printer.
+
+        Args:
+            gcode: G-code to modify
+
+        Returns:
+            Converted g-code
+        """
+
+        return sub(" ;.*", "", gcode, flags=RegexFlag.MULTILINE)
+
+    @staticmethod
     def _remove_initial_comments(gcode):
         """Remove initial Cura comments and add gx_converter comment
 
@@ -123,8 +137,8 @@ class GCodeTransformer:
         return ";created with gx-convert\n;github.com/bkienzle/gx-convert\n" + gcode
 
     @staticmethod
-    def _insert_initialization_code(gcode):
-        """Add initialization code
+    def _insert_dimensions(gcode):
+        """Add print dimensions.
 
         Args:
             gcode: G-code to modify
@@ -133,7 +147,7 @@ class GCodeTransformer:
             Converted g-code
         """
 
-        return "M118 X17.55 Y15.00 Z10.10 T0\n" + gcode
+        return "M118 X10.00 Y10.00 Z10.00 T0\n" + gcode
 
     @staticmethod
     def _remove_extra_footer(gcode):
