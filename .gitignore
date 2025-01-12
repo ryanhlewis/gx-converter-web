@@ -86,3 +86,4 @@ fabric.properties
 scratch/
 *.egg-info/
 dist/
+*.DS_Store
