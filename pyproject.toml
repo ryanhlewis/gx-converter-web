@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = 'gx-converter'
 description = 'A tool to convert g-code into the FlashPrint .gx file format'
-dynamic = ['version']
+dynamic = ["version"]
 authors = [{ name = 'bkienzle3', email = 'pypi@bkienzle.com' }]
 license = { text = 'GNU General Public License v3 (GPLv3)' }
 readme = 'README.md'
@@ -58,6 +58,9 @@ classifiers = [
 ]
 
 requires-python = '>3.9'
+
+[project.scripts]
+gx-converter = "gx_converter.main:main"
 
 [project.urls]
 bugs = 'https://github.com/bkienzle/gx-converter/issues'

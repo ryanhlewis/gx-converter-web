@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="gx_converter",
-    version="0.1.0",
+    version="0.1.3",
     packages=find_packages(),
     entry_points={
         "console_scripts": [
