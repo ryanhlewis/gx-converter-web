@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
+<title>GX Converter – .gcode to .gx (Instant, Offline)</title>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#111827;
+    --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.12);
+    --text:#e5e7eb; --muted:#9ca3af; --accent:#60a5fa; --accent2:#a78bfa;
+    --ok:#34d399; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden;background:
+    radial-gradient(1200px 800px at 80% -10%,#1f2937 0%,var(--bg1) 40%,var(--bg2) 100%);
+    color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+  .frame{height:100vh;width:100vw;display:grid;place-items:center}
+  .card{
+    width:min(1200px,96vw);
+    aspect-ratio:16/9;
+    border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04));
+    border:1px solid var(--card-border);
+    box-shadow:0 40px 100px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+    position:relative;overflow:clip
+  }
+  .glow{position:absolute;right:-8%;bottom:-10%;width:45%;height:45%;
+    background:radial-gradient(closest-side,rgba(96,165,250,0.35),rgba(167,139,250,0.15),transparent 70%);
+    filter:blur(22px);pointer-events:none}
+  header{position:absolute;inset:22px 22px auto 22px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
+  .logo{width:38px;height:38px;border-radius:10px;background:conic-gradient(from 200deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;box-shadow:0 8px 22px rgba(96,165,250,0.35)}
+  .hint{color:var(--muted);font-size:12px}
+  .drop{
+    position:absolute;inset:120px 36px 86px 36px; /* bigger, with breathing room for bubbles */
+    border:2px dashed rgba(148,163,184,0.38);border-radius:16px;
+    display:grid;place-items:center;text-align:center;padding:44px;
+    transition:transform .2s,border-color .2s,background .2s; background:rgba(255,255,255,0.02)
+  }
+  .drop.dragover{transform:scale(1.01);border-color:var(--accent);
+    background:linear-gradient(180deg,rgba(96,165,250,0.10),rgba(255,255,255,0.03))}
+  .cta{display:grid;gap:16px;align-items:center;justify-items:center}
+  .big-icon{width:92px;height:92px;border-radius:18px;display:grid;place-items:center;
+    background:radial-gradient(circle at 30% 30%,rgba(96,165,250,0.35),rgba(167,139,250,0.15));
+    border:1px solid rgba(255,255,255,0.18)}
+  .title{font-size:30px;font-weight:900;letter-spacing:.2px}
+  .subtitle{color:var(--muted);font-size:15px;max-width:680px}
+  .btn{border:0;outline:0;cursor:pointer;font-weight:800;font-size:15px;letter-spacing:.2px;
+    padding:13px 20px;border-radius:14px;background:linear-gradient(180deg,var(--accent),var(--accent2));color:#fff;
+    box-shadow:0 10px 30px rgba(79,70,229,0.35)}
+  .meta{font-size:12px;color:var(--muted)}
+  .status{position:absolute;bottom:16px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .status .left{display:flex;align-items:center;gap:10px}
+  .tag{font-size:12px;padding:7px 12px;border-radius:999px;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.25)}
+  .ok{background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#d1fae5}
+  .warn{background:rgba(245,158,11,0.15);border-color:rgba(245,158,11,0.35);color:#fffbeb}
+  input[type=file]{display:none}
+
+  /* Full-page drag overlay to prevent flicker & keep on top */
+  .overlay{
+    position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+    background:rgba(2,6,23,0.50); border:3px dashed rgba(96,165,250,0.8);
+    opacity:0; pointer-events:none; transition:opacity .12s ease
+  }
+  .overlay.active{opacity:1; pointer-events:auto}
+  .overlay .inner{
+    display:grid;gap:14px;place-items:center;text-align:center;padding:28px 34px;border-radius:16px;
+    background:rgba(30,41,59,0.55); border:1px solid rgba(148,163,184,0.35)
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="card" id="card">
+    <div class="glow"></div>
+    <header>
+      <div class="brand"><div class="logo">GX</div><div>GX Converter</div></div>
+      <div class="hint">Drop your <strong>.gcode</strong> or click · Runs 100% locally</div>
+    </header>
+
+    <div class="drop" id="drop">
+      <div class="cta">
+        <div class="big-icon" aria-hidden="true">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 17l7.5-7.5a3.536 3.536 0 015 5L12 20a6 6 0 11-8.485-8.485l8-8"
+                  stroke="white" stroke-opacity=".9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="title">Drop .gcode to Convert</div>
+        <div class="subtitle">Instant offline conversion to <strong>.gx</strong> for FlashForge Adventurer / Monoprice Voxel. Drag anywhere or click below.</div>
+        <button class="btn" id="browseBtn" type="button">Choose .gcode</button>
+        <div class="meta">Based on the gx-converter transforms & header.</div>
+      </div>
+    </div>
+
+    <!-- hidden input lives outside clickable label to avoid double prompt -->
+    <input type="file" accept=".gcode,.gco,.nc,.txt" id="fileInput"/>
+
+    <div class="status">
+      <div class="left">
+        <div class="tag" id="fileTag">No file selected</div>
+        <div class="tag" id="speedTag">Ready</div>
+      </div>
+      <div class="tag">Local · Private</div>
+    </div>
+  </div>
+</div>
+
+<!-- Full-viewport overlay for drag/drop -->
+<div class="overlay" id="overlay">
+  <div class="inner">
+    <div class="title">Drop to Convert</div>
+    <div class="subtitle">Release anywhere to generate your .gx instantly</div>
+  </div>
+</div>
+
+<script>
+/* ============== Utils ============== */
+const te = new TextEncoder(), td = new TextDecoder();
+const nowMs = () => performance.now();
+function download(name, blob){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+/* ============== GX header (JS port) ============== */
+const GX_HEADER = {
+  MAGIC: Uint8Array.from([0x78,0x67,0x63,0x6f,0x64,0x65,0x20,0x31,0x2e,0x30,0x0a,0x00,0x00,0x00,0x00,0x00]),
+  BMP_OFFSET: 58, FILAMENT_USAGE_2:0, MULTI_EXTRUDER_TYPE:0x000b, UNDOC1:100,
+  UNDOC2_BYTES: Uint8Array.from([0x01,0xff]),
+};
+function makeBMP(w=120,h=40){
+  const rowRaw=w*3, rowPad=(4-(rowRaw%4))%4, rowSize=rowRaw+rowPad, pixels=rowSize*h;
+  const size=14+40+pixels; const buf=new ArrayBuffer(size); const v=new DataView(buf); let o=0;
+  v.setUint16(o,0x4D42,true); o+=2; v.setUint32(o,size,true); o+=4; v.setUint16(o,0,true); o+=2; v.setUint16(o,0,true); o+=2; v.setUint32(o,54,true); o+=4;
+  v.setUint32(o,40,true); o+=4; v.setInt32(o,w,true); o+=4; v.setInt32(o,h,true); o+=4; v.setUint16(o,1,true); o+=2; v.setUint16(o,24,true); o+=2;
+  v.setUint32(o,0,true); o+=4; v.setUint32(o,pixels,true); o+=4; v.setInt32(o,2835,true); o+=4; v.setInt32(o,2835,true); o+=4; v.setUint32(o,0,true); o+=4; v.setUint32(o,0,true); o+=4;
+  const bytes=new Uint8Array(buf); let p=54;
+  for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const t=(x+y)/(w+h); const B=Math.floor(240-120*t), G=Math.floor(160+60*t), R=Math.floor(120+100*(1-t)); bytes[p++]=B; bytes[p++]=G; bytes[p++]=R; }
+    for(let k=0;k<rowPad;k++) bytes[p++]=0; }
+  return bytes;
+}
+function buildGxHeader(props,bmp){
+  const {MAGIC,BMP_OFFSET,FILAMENT_USAGE_2,MULTI_EXTRUDER_TYPE,UNDOC1,UNDOC2_BYTES}=GX_HEADER;
+  const GCODE_OFFSET=BMP_OFFSET+bmp.length, headerLen=58+bmp.length;
+  const buf=new ArrayBuffer(headerLen), out=new Uint8Array(buf), dv=new DataView(buf); let o=0;
+  out.set(MAGIC,o); o+=MAGIC.length;
+  dv.setUint32(o,BMP_OFFSET,true); o+=4;
+  dv.setUint32(o,GCODE_OFFSET,true); o+=4;
+  dv.setUint32(o,GCODE_OFFSET,true); o+=4;
+  dv.setInt32(o,props.printTimeSec,true); o+=4;
+  dv.setInt32(o,props.filamentMm,true); o+=4;
+  dv.setInt32(o,FILAMENT_USAGE_2,true); o+=4;
+  dv.setInt16(o,MULTI_EXTRUDER_TYPE,true); o+=2;
+  dv.setInt16(o,props.layerMicrons,true); o+=2;
+  dv.setInt16(o,UNDOC1,true); o+=2;
+  dv.setInt16(o,props.shells,true); o+=2;
+  dv.setInt16(o,props.printSpeed,true); o+=2;
+  dv.setInt16(o,props.bedTemp,true); o+=2;
+  dv.setInt16(o,props.nozzleTemp,true); o+=2;
+  dv.setInt16(o,props.nozzleTemp,true); o+=2;
+  out.set(UNDOC2_BYTES,o); o+=2;
+  out.set(bmp,o);
+  return out;
+}
+
+/* ============== Extractors (JS ports) ============== */
+const Extract = {
+  _extractCommentValue(comment,g){
+    const m=g.match(new RegExp(`^;${escapeRegExp(comment)}:.*`,'m')); if(!m) return 0;
+    let v=m[0].split(':')[1].trim();
+    if(v.includes('m')){ v=v.replace(/m/g,''); const parts=v.split('.'); const after=(parts[1]||'').slice(0,3); v=(parts[0]||'0')+after; }
+    v=v.replace(/\./g,'');
+    const n=parseInt(v,10); return Number.isFinite(n)?n:0;
+  },
+  _extractCommandValue(command,marker,g){
+    const m=g.match(new RegExp(`^${escapeRegExp(command)}\\s+.*`,'m')); if(!m) return 0;
+    for(const a of m[0].trim().split(/\s+/)){ if(a.startsWith(marker)){ const n=parseInt(a.slice(marker.length),10); if(Number.isFinite(n)) return n; } }
+    return 0;
+  },
+  getPrintTime:g=>Extract._extractCommentValue("TIME",g),
+  getLayerHeightMicrons:g=>Extract._extractCommentValue("Layer height",g)*10,
+  getFilamentUsageMm:g=>Extract._extractCommentValue("Filament used",g),
+  getNozzleTemp:g=>Extract._extractCommandValue("M104","S",g),
+  getBedTemp:g=>Extract._extractCommandValue("M140","S",g),
+};
+
+/* ============== Transformer (JS port) ============== */
+const Transform = {
+  convert(g){
+    g=this._removeInitialComments(g);
+    g=this._insertDimensions(g);
+    g=this._addInitialComments(g);
+    g=this._convertAbsolutePositioning(g);
+    g=this._convertTemperatureCommands(g,"M140");
+    g=this._convertTemperatureCommands(g,"M104");
+    g=this._addBreakAndContinue(g);
+    g=this._removeInlineComments(g);
+    g=this._removeExtraFooter(g);
+    return g;
+  },
+  _convertTemperatureCommands(g,cmd){
+    const re=new RegExp(`^${escapeRegExp(cmd)}.*$`,'m');
+    const m=g.match(re); if(!m) return g;
+    const replaced=m[0].trim().replace(/\s+T0\b/,'')+" T0"; // ensure single T0
+    return g.replace(re,replaced);
+  },
+  _addBreakAndContinue:g=>g.replace(/^G92 E0.*\n^G92 E0.*$/m,"M108 T0"),
+  _convertAbsolutePositioning:g=>g.replace(/^M82.*$/m,"G90"),
+  _removeInlineComments:g=>g.replace(/ ;.*$/gm,""),
+  _removeInitialComments(g){ while(g.startsWith(';')){ const i=g.indexOf('\n'); if(i===-1) return ""; g=g.slice(i+1); } return g; },
+  _addInitialComments:g=>";created with gx-convert\n;github.com/bkienzle/gx-convert\n"+g,
+  _insertDimensions:g=>"M118 X10.00 Y10.00 Z10.00 T0\n"+g,
+  _removeExtraFooter:g=>g.replace(/^M18[\s\S]*/m,"M18"),
+};
+
+/* ============== Orchestrator ============== */
+async function gcodeToGx(file){
+  const t0=nowMs(); const text=await file.text();
+  const bedTemp=Extract.getBedTemp(text);
+  const nozzleTemp=Extract.getNozzleTemp(text);
+  const printTimeSec=Extract.getPrintTime(text);
+  const filamentMm=Extract.getFilamentUsageMm(text);
+  const layerMicrons=Extract.getLayerHeightMicrons(text);
+  const shells=3, printSpeed=60;
+
+  const converted=Transform.convert(text);
+  const gcodeBytes=te.encode(converted);
+  const bmp=makeBMP(120,40);
+  const header=buildGxHeader({printTimeSec,filamentMm,layerMicrons,shells,printSpeed,bedTemp,nozzleTemp},bmp);
+
+  const out=new Uint8Array(header.length+gcodeBytes.length);
+  out.set(header,0); out.set(gcodeBytes,header.length);
+  return { bytes: out, elapsedMs: Math.max(1,Math.round(nowMs()-t0)) };
+}
+
+/* ============== UI wiring (no double prompts, no flicker) ============== */
+const drop = document.getElementById('drop');
+const overlay = document.getElementById('overlay');
+const fileInput = document.getElementById('fileInput');
+const browseBtn = document.getElementById('browseBtn');
+const fileTag = document.getElementById('fileTag');
+const speedTag = document.getElementById('speedTag');
+
+browseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fileInput.click(); }, { passive:true });
+drop.addEventListener('click', () => fileInput.click(), { passive:true });
+
+fileInput.addEventListener('change', async e=>{
+  const f=e.target.files?.[0]; if(f) await handleFile(f); fileInput.value="";
+});
+
+async function handleFile(file){
+  fileTag.textContent = `${file.name} • ${(file.size/1024).toFixed(1)} KB`;
+  speedTag.textContent = "Converting…"; speedTag.classList.remove('ok','warn');
+  try{
+    const {bytes, elapsedMs} = await gcodeToGx(file);
+    const outName=(file.name.replace(/\.[^.]+$/,'')||'output')+'.gx';
+    download(outName, new Blob([bytes], {type:'application/octet-stream'}));
+    speedTag.textContent=`Done in ${elapsedMs}ms`; speedTag.classList.add('ok');
+  }catch(err){
+    console.error(err); speedTag.textContent="Conversion failed"; speedTag.classList.add('warn');
+    alert("Conversion failed. Check console for details.");
+  }
+}
+
+/* ---- Global drag overlay with counter to prevent blinking ---- */
+let dragCounter = 0;
+function showOverlay(){ overlay.classList.add('active'); drop.classList.add('dragover'); }
+function hideOverlay(){ overlay.classList.remove('active'); drop.classList.remove('dragover'); }
+
+['dragenter','dragover','dragleave','drop'].forEach(evt=>{
+  document.addEventListener(evt, e=>{ e.preventDefault(); }, { passive:false });
+});
+
+document.addEventListener('dragenter', e=>{ dragCounter++; showOverlay(); }, { passive:false });
+document.addEventListener('dragleave', e=>{ dragCounter=Math.max(0,dragCounter-1); if(dragCounter===0) hideOverlay(); }, { passive:false });
+
+overlay.addEventListener('dragover', e=>{ e.preventDefault(); }, { passive:false });
+overlay.addEventListener('drop', async e=>{
+  e.preventDefault(); e.stopPropagation();
+  const f=e.dataTransfer?.files?.[0]; dragCounter=0; hideOverlay();
+  if(f) await handleFile(f);
+}, { passive:false });
+
+/* Also allow dropping directly on the card/drop zone */
+drop.addEventListener('dragover', e=>{ e.preventDefault(); }, { passive:false });
+drop.addEventListener('drop', async e=>{
+  e.preventDefault(); e.stopPropagation();
+  const f=e.dataTransfer?.files?.[0]; dragCounter=0; hideOverlay();
+  if(f) await handleFile(f);
+}, { passive:false });
+
+</script>
+</body>
+</html>
