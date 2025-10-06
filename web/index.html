@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0f172a"/>
 <title>GX Converter – .gcode to .gx (Instant, Offline)</title>
 <style>
   :root{
@@ -10,76 +11,118 @@
     --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.12);
     --text:#e5e7eb; --muted:#9ca3af; --accent:#60a5fa; --accent2:#a78bfa;
     --ok:#34d399; --warn:#f59e0b;
+    --pad: clamp(12px, 2.2vw, 22px);
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;overflow:hidden;background:
+  html,body{height:100%;margin:0;background:
     radial-gradient(1200px 800px at 80% -10%,#1f2937 0%,var(--bg1) 40%,var(--bg2) 100%);
-    color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
-  .frame{height:100vh;width:100vw;display:grid;place-items:center}
+    color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+    -webkit-text-size-adjust:100%;
+    overscroll-behavior:none;
+  }
+  body{min-height:100dvh; display:grid; place-items:center}
+
+  .frame{min-height:100dvh; width:100%; display:grid; place-items:center; padding:var(--pad); overflow:hidden;}
   .card{
-    width:min(1200px,96vw);
-    aspect-ratio:16/9;
+    width:min(1100px, 96vw);
     border-radius:20px;
     background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.04));
     border:1px solid var(--card-border);
     box-shadow:0 40px 100px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
-    position:relative;overflow:clip
+    position:relative;overflow:clip;
+    aspect-ratio:16/9; /* default for desktop */
   }
   .glow{position:absolute;right:-8%;bottom:-10%;width:45%;height:45%;
     background:radial-gradient(closest-side,rgba(96,165,250,0.35),rgba(167,139,250,0.15),transparent 70%);
     filter:blur(22px);pointer-events:none}
-  header{position:absolute;inset:22px 22px auto 22px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
-  .logo{width:38px;height:38px;border-radius:10px;background:conic-gradient(from 200deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;box-shadow:0 8px 22px rgba(96,165,250,0.35)}
+
+  header{position:absolute;inset:var(--pad) var(--pad) auto var(--pad);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:clamp(16px,1.2vw,20px)}
+  .logo{width:38px;height:38px;border-radius:10px;background:conic-gradient(from 200deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;box-shadow:0 8px 22px rgba(96,165,250,0.35); font-weight:900}
   .hint{color:var(--muted);font-size:12px}
+
+  /* Drop zone positioning is responsive via CSS vars */
+  .card{ --drop-top: 120px; --drop-bottom: 86px; }
   .drop{
-    position:absolute;inset:120px 36px 86px 36px; /* bigger, with breathing room for bubbles */
+    position:absolute;inset:var(--drop-top) var(--pad) var(--drop-bottom) var(--pad);
     border:2px dashed rgba(148,163,184,0.38);border-radius:16px;
-    display:grid;place-items:center;text-align:center;padding:44px;
-    transition:transform .2s,border-color .2s,background .2s; background:rgba(255,255,255,0.02)
+    display:grid;place-items:center;text-align:center;padding:clamp(24px,3.6vw,44px);
+    transition:transform .2s,border-color .2s,background .2s; background:rgba(255,255,255,0.02);
+    outline:none; touch-action:manipulation;
   }
   .drop.dragover{transform:scale(1.01);border-color:var(--accent);
     background:linear-gradient(180deg,rgba(96,165,250,0.10),rgba(255,255,255,0.03))}
-  .cta{display:grid;gap:16px;align-items:center;justify-items:center}
+
+  .cta{display:grid;gap:16px;align-items:center;justify-items:center; max-width:min(680px, 96%)}
   .big-icon{width:92px;height:92px;border-radius:18px;display:grid;place-items:center;
     background:radial-gradient(circle at 30% 30%,rgba(96,165,250,0.35),rgba(167,139,250,0.15));
     border:1px solid rgba(255,255,255,0.18)}
-  .title{font-size:30px;font-weight:900;letter-spacing:.2px}
-  .subtitle{color:var(--muted);font-size:15px;max-width:680px}
+  .title{font-size:clamp(22px,2vw,30px);font-weight:900;letter-spacing:.2px}
+  .subtitle{color:var(--muted);font-size:clamp(13px,1.1vw,15px)}
   .btn{border:0;outline:0;cursor:pointer;font-weight:800;font-size:15px;letter-spacing:.2px;
     padding:13px 20px;border-radius:14px;background:linear-gradient(180deg,var(--accent),var(--accent2));color:#fff;
     box-shadow:0 10px 30px rgba(79,70,229,0.35)}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(96,165,250,.55)}
   .meta{font-size:12px;color:var(--muted)}
-  .status{position:absolute;bottom:16px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .status .left{display:flex;align-items:center;gap:10px}
+
+  .status{position:absolute;bottom:var(--pad);left:var(--pad);right:var(--pad);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .status .left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .tag{font-size:12px;padding:7px 12px;border-radius:999px;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.25)}
   .ok{background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#d1fae5}
   .warn{background:rgba(245,158,11,0.15);border-color:rgba(245,158,11,0.35);color:#fffbeb}
   input[type=file]{display:none}
 
-  /* Full-page drag overlay to prevent flicker & keep on top */
-  .overlay{
-    position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+  /* Full-viewport drag overlay */
+  .overlay{ position:fixed; inset:0; z-index:9999; display:grid; place-items:center;
     background:rgba(2,6,23,0.50); border:3px dashed rgba(96,165,250,0.8);
-    opacity:0; pointer-events:none; transition:opacity .12s ease
-  }
+    opacity:0; pointer-events:none; transition:opacity .12s ease }
   .overlay.active{opacity:1; pointer-events:auto}
-  .overlay .inner{
-    display:grid;gap:14px;place-items:center;text-align:center;padding:28px 34px;border-radius:16px;
-    background:rgba(30,41,59,0.55); border:1px solid rgba(148,163,184,0.35)
+  .overlay .inner{ display:grid; gap:14px; place-items:center; text-align:center; padding:28px 34px; border-radius:16px;
+    background:rgba(30,41,59,0.55); border:1px solid rgba(148,163,184,0.35) }
+
+  /* Spinner for progress */
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;display:inline-block;animation:spin .9s linear infinite;vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Focus ring for keyboard nav */
+  .drop:focus-visible{outline:2px solid var(--accent); outline-offset:4px}
+
+  /* Mobile tweaks */
+  @media (max-width: 1000px){
+    .card{ aspect-ratio:auto; min-height:560px; border-radius:16px; }
+    .card{ --drop-top: 90px; --drop-bottom: 78px; }
+    .logo{ width:32px; height:32px; border-radius:8px }
+    .brand{ gap:10px }
+    .big-icon{ width:72px; height:72px }
+    .btn{ font-size:14px; padding:12px 16px; border-radius:12px }
+    .hint{ display:none }
+  }
+
+  /* Very small devices */
+  @media (max-width: 380px){
+    .card{ min-height:520px }
+    .cta{ gap:12px }
+    .subtitle{ font-size:12.5px }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    .drop, .overlay{ transition:none }
+    .glow{ filter:none }
   }
 </style>
 </head>
 <body>
 <div class="frame">
   <div class="card" id="card">
-    <div class="glow"></div>
+    <div class="glow" aria-hidden="true"></div>
+
     <header>
-      <div class="brand"><div class="logo">GX</div><div>GX Converter</div></div>
-      <div class="hint">Drop your <strong>.gcode</strong> or click · Runs 100% locally</div>
+      <div class="brand"><div class="logo" aria-hidden="true">GX</div><div>GX Converter</div></div>
+      <div class="hint">Drop your <strong>.gcode</strong> or tap · Runs 100% locally</div>
     </header>
 
-    <div class="drop" id="drop">
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="Drop zone. Drop or choose a .gcode file to convert.">
       <div class="cta">
         <div class="big-icon" aria-hidden="true">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -88,16 +131,16 @@
           </svg>
         </div>
         <div class="title">Drop .gcode to Convert</div>
-        <div class="subtitle">Instant offline conversion to <strong>.gx</strong> for FlashForge Adventurer / Monoprice Voxel. Drag anywhere or click below.</div>
-        <button class="btn" id="browseBtn" type="button">Choose .gcode</button>
-        <div class="meta">Based on the gx-converter transforms & header.</div>
+        <div class="subtitle">Instant offline conversion to <strong>.gx</strong> for FlashForge Adventurer / Monoprice Voxel. Drag anywhere or tap below.</div>
+        <button class="btn" id="browseBtn" type="button" aria-describedby="helper">Choose .gcode</button>
+        <div class="meta" id="helper">Based on the gx-converter transforms & header.</div>
       </div>
     </div>
 
     <!-- hidden input lives outside clickable label to avoid double prompt -->
     <input type="file" accept=".gcode,.gco,.nc,.txt" id="fileInput"/>
 
-    <div class="status">
+    <div class="status" aria-live="polite">
       <div class="left">
         <div class="tag" id="fileTag">No file selected</div>
         <div class="tag" id="speedTag">Ready</div>
@@ -108,7 +151,7 @@
 </div>
 
 <!-- Full-viewport overlay for drag/drop -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlay" aria-hidden="true">
   <div class="inner">
     <div class="title">Drop to Convert</div>
     <div class="subtitle">Release anywhere to generate your .gx instantly</div>
@@ -116,7 +159,7 @@
 </div>
 
 <script>
-/* ============== Utils ============== */
+/********************** Utils **********************/
 const te = new TextEncoder(), td = new TextDecoder();
 const nowMs = () => performance.now();
 function download(name, blob){
@@ -125,8 +168,13 @@ function download(name, blob){
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
 }
 const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const formatBytes = (bytes)=>{
+  if(bytes < 1024) return `${bytes} B`;
+  const kb = bytes/1024; if(kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb/1024; return `${mb.toFixed(2)} MB`;
+}
 
-/* ============== GX header (JS port) ============== */
+/********************** GX header (JS port) **********************/
 const GX_HEADER = {
   MAGIC: Uint8Array.from([0x78,0x67,0x63,0x6f,0x64,0x65,0x20,0x31,0x2e,0x30,0x0a,0x00,0x00,0x00,0x00,0x00]),
   BMP_OFFSET: 58, FILAMENT_USAGE_2:0, MULTI_EXTRUDER_TYPE:0x000b, UNDOC1:100,
@@ -139,8 +187,13 @@ function makeBMP(w=120,h=40){
   v.setUint32(o,40,true); o+=4; v.setInt32(o,w,true); o+=4; v.setInt32(o,h,true); o+=4; v.setUint16(o,1,true); o+=2; v.setUint16(o,24,true); o+=2;
   v.setUint32(o,0,true); o+=4; v.setUint32(o,pixels,true); o+=4; v.setInt32(o,2835,true); o+=4; v.setInt32(o,2835,true); o+=4; v.setUint32(o,0,true); o+=4; v.setUint32(o,0,true); o+=4;
   const bytes=new Uint8Array(buf); let p=54;
-  for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const t=(x+y)/(w+h); const B=Math.floor(240-120*t), G=Math.floor(160+60*t), R=Math.floor(120+100*(1-t)); bytes[p++]=B; bytes[p++]=G; bytes[p++]=R; }
-    for(let k=0;k<rowPad;k++) bytes[p++]=0; }
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const t=(x+y)/(w+h); const B=Math.floor(240-120*t), G=Math.floor(160+60*t), R=Math.floor(120+100*(1-t));
+      bytes[p++]=B; bytes[p++]=G; bytes[p++]=R;
+    }
+    for(let k=0;k<rowPad;k++) bytes[p++]=0;
+  }
   return bytes;
 }
 function buildGxHeader(props,bmp){
@@ -167,18 +220,23 @@ function buildGxHeader(props,bmp){
   return out;
 }
 
-/* ============== Extractors (JS ports) ============== */
+/********************** Extractors (JS ports) **********************/
 const Extract = {
   _extractCommentValue(comment,g){
-    const m=g.match(new RegExp(`^;${escapeRegExp(comment)}:.*`,'m')); if(!m) return 0;
+    const m=g.match(new RegExp(`^;${escapeRegExp(comment)}:.*`,`m`)); if(!m) return 0;
     let v=m[0].split(':')[1].trim();
-    if(v.includes('m')){ v=v.replace(/m/g,''); const parts=v.split('.'); const after=(parts[1]||'').slice(0,3); v=(parts[0]||'0')+after; }
+    if(v.includes('m')){ // supports e.g. "12.3m"
+      v=v.replace(/m/g,''); const parts=v.split('.'); const after=(parts[1]||'').slice(0,3); v=(parts[0]||'0')+after; }
     v=v.replace(/\./g,'');
     const n=parseInt(v,10); return Number.isFinite(n)?n:0;
   },
   _extractCommandValue(command,marker,g){
-    const m=g.match(new RegExp(`^${escapeRegExp(command)}\\s+.*`,'m')); if(!m) return 0;
-    for(const a of m[0].trim().split(/\s+/)){ if(a.startsWith(marker)){ const n=parseInt(a.slice(marker.length),10); if(Number.isFinite(n)) return n; } }
+    const m=g.match(new RegExp(`^${escapeRegExp(command)}\\s+.*`,`m`)); if(!m) return 0;
+    for(const a of m[0].trim().split(/\s+/)){
+      if(a.startsWith(marker)){
+        const n=parseInt(a.slice(marker.length),10); if(Number.isFinite(n)) return n;
+      }
+    }
     return 0;
   },
   getPrintTime:g=>Extract._extractCommentValue("TIME",g),
@@ -188,7 +246,7 @@ const Extract = {
   getBedTemp:g=>Extract._extractCommandValue("M140","S",g),
 };
 
-/* ============== Transformer (JS port) ============== */
+/********************** Transformer (JS port) **********************/
 const Transform = {
   convert(g){
     g=this._removeInitialComments(g);
@@ -203,7 +261,7 @@ const Transform = {
     return g;
   },
   _convertTemperatureCommands(g,cmd){
-    const re=new RegExp(`^${escapeRegExp(cmd)}.*$`,'m');
+    const re=new RegExp(`^${escapeRegExp(cmd)}.*$`,`m`);
     const m=g.match(re); if(!m) return g;
     const replaced=m[0].trim().replace(/\s+T0\b/,'')+" T0"; // ensure single T0
     return g.replace(re,replaced);
@@ -217,7 +275,7 @@ const Transform = {
   _removeExtraFooter:g=>g.replace(/^M18[\s\S]*/m,"M18"),
 };
 
-/* ============== Orchestrator ============== */
+/********************** Orchestrator **********************/
 async function gcodeToGx(file){
   const t0=nowMs(); const text=await file.text();
   const bedTemp=Extract.getBedTemp(text);
@@ -237,7 +295,7 @@ async function gcodeToGx(file){
   return { bytes: out, elapsedMs: Math.max(1,Math.round(nowMs()-t0)) };
 }
 
-/* ============== UI wiring (no double prompts, no flicker) ============== */
+/********************** UI wiring **********************/
 const drop = document.getElementById('drop');
 const overlay = document.getElementById('overlay');
 const fileInput = document.getElementById('fileInput');
@@ -247,17 +305,22 @@ const speedTag = document.getElementById('speedTag');
 
 browseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fileInput.click(); }, { passive:true });
 drop.addEventListener('click', () => fileInput.click(), { passive:true });
+drop.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click(); } });
 
 fileInput.addEventListener('change', async e=>{
   const f=e.target.files?.[0]; if(f) await handleFile(f); fileInput.value="";
 });
 
 async function handleFile(file){
-  fileTag.textContent = `${file.name} • ${(file.size/1024).toFixed(1)} KB`;
-  speedTag.textContent = "Converting…"; speedTag.classList.remove('ok','warn');
+  const name = file.name || 'input.gcode';
+  const extOk = /(\.gcode|\.gco|\.nc|\.txt)$/i.test(name);
+  fileTag.textContent = `${name} • ${formatBytes(file.size)}`;
+  speedTag.innerHTML = '<span class="spinner" aria-hidden="true"></span>Converting…';
+  speedTag.classList.remove('ok','warn');
+  if(!extOk){ speedTag.textContent='Unsupported file type'; speedTag.classList.add('warn'); return; }
   try{
     const {bytes, elapsedMs} = await gcodeToGx(file);
-    const outName=(file.name.replace(/\.[^.]+$/,'')||'output')+'.gx';
+    const outName=(name.replace(/\.[^.]+$/, '')||'output')+'.gx';
     download(outName, new Blob([bytes], {type:'application/octet-stream'}));
     speedTag.textContent=`Done in ${elapsedMs}ms`; speedTag.classList.add('ok');
   }catch(err){
@@ -266,7 +329,7 @@ async function handleFile(file){
   }
 }
 
-/* ---- Global drag overlay with counter to prevent blinking ---- */
+/* Global drag overlay with counter to prevent blinking */
 let dragCounter = 0;
 function showOverlay(){ overlay.classList.add('active'); drop.classList.add('dragover'); }
 function hideOverlay(){ overlay.classList.remove('active'); drop.classList.remove('dragover'); }
@@ -292,7 +355,6 @@ drop.addEventListener('drop', async e=>{
   const f=e.dataTransfer?.files?.[0]; dragCounter=0; hideOverlay();
   if(f) await handleFile(f);
 }, { passive:false });
-
 </script>
 </body>
 </html>
