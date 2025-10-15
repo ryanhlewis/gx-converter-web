@@ -275,25 +275,107 @@ const Transform = {
   _removeExtraFooter:g=>g.replace(/^M18[\s\S]*/m,"M18"),
 };
 
-/********************** Orchestrator **********************/
-async function gcodeToGx(file){
-  const t0=nowMs(); const text=await file.text();
-  const bedTemp=Extract.getBedTemp(text);
-  const nozzleTemp=Extract.getNozzleTemp(text);
-  const printTimeSec=Extract.getPrintTime(text);
-  const filamentMm=Extract.getFilamentUsageMm(text);
-  const layerMicrons=Extract.getLayerHeightMicrons(text);
-  const shells=3, printSpeed=60;
-
-  const converted=Transform.convert(text);
-  const gcodeBytes=te.encode(converted);
-  const bmp=makeBMP(120,40);
-  const header=buildGxHeader({printTimeSec,filamentMm,layerMicrons,shells,printSpeed,bedTemp,nozzleTemp},bmp);
-
-  const out=new Uint8Array(header.length+gcodeBytes.length);
-  out.set(header,0); out.set(gcodeBytes,header.length);
-  return { bytes: out, elapsedMs: Math.max(1,Math.round(nowMs()-t0)) };
+// Convert "3h 34m 11s" to seconds
+function parsePrintTime(text) {
+  const m = text.match(/estimated printing time.*?=\s*(\d+)h\s*(\d+)m\s*(\d+)s/i);
+  return m ? (parseInt(m[1],10) * 3600 + parseInt(m[2],10) * 60 + parseInt(m[3],10)) : 0;
 }
+
+// Convert "filament used [mm] = 7114.77" to integer millimetres
+function parseFilament(text) {
+  const m = text.match(/filament used \[mm\]\s*=\s*([\d.]+)/i);
+  return m ? Math.round(parseFloat(m[1])) : 0;
+}
+
+// Convert "default_print_profile = 0.20mm …" to microns
+function parseLayerHeightMicrons(text) {
+  const m = text.match(/default_print_profile\s*=\s*([\d.]+)mm/i);
+  return m ? Math.round(parseFloat(m[1]) * 1000) : (Extract.getLayerHeightMicrons(text) || 0);
+}
+
+// Extract base64 thumbnail and convert to 80×60 BMP
+async function extractThumbnailBMP(text) {
+  const m = /;\s*thumbnail begin\s+(\d+)x(\d+)\s+\d+[\s\n]+([\s\S]*?)\s*;\s*thumbnail end/.exec(text);
+  if (!m) return null;
+  const base64 = m[3].split(/\r?\n/).map(line => line.replace(/^;\s*/, '')).join('');
+  const binary = atob(base64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i=0; i<bytes.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob   = new Blob([bytes], { type: 'image/png' });
+  const img    = await createImageBitmap(blob);
+  // draw to 80×60 canvas
+  const canvas = document.createElement('canvas');
+  canvas.width  = 80; canvas.height = 60;
+  const ctx     = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, 80, 60);
+  const data    = ctx.getImageData(0, 0, 80, 60).data;
+  // convert RGBA data to uncompressed 24‑bit BMP
+  const rowRaw  = 80 * 3;
+  const pad     = (4 - (rowRaw % 4)) % 4;
+  const size    = 14 + 40 + (rowRaw + pad) * 60;
+  const buf     = new ArrayBuffer(size);
+  const dv      = new DataView(buf);
+  let off       = 0;
+  dv.setUint16(off, 0x4D42, true); off += 2;    // 'BM'
+  dv.setUint32(off, size, true); off += 4;
+  dv.setUint32(off, 0, true); off += 4;
+  dv.setUint32(off, 54, true); off += 4;
+  dv.setUint32(off, 40, true); off += 4;
+  dv.setInt32(off, 80, true); off += 4;
+  dv.setInt32(off, 60, true); off += 4;
+  dv.setUint16(off, 1, true); off += 2;
+  dv.setUint16(off, 24, true); off += 2;
+  dv.setUint32(off, 0, true); off += 4;
+  dv.setUint32(off, (rowRaw + pad) * 60, true); off += 4;
+  dv.setInt32(off, 2835, true); off += 4;
+  dv.setInt32(off, 2835, true); off += 4;
+  dv.setUint32(off, 0, true); off += 4;
+  dv.setUint32(off, 0, true); off += 4;
+  const out = new Uint8Array(buf);
+  let p = 54;
+  for (let y = 59; y >= 0; y--) {
+    for (let x = 0; x < 80; x++) {
+      const i = (y * 80 + x) * 4;
+      out[p++] = data[i + 2];
+      out[p++] = data[i + 1];
+      out[p++] = data[i + 0];
+    }
+    for (let k = 0; k < pad; k++) out[p++] = 0;
+  }
+  return out;
+}
+
+// Main conversion routine
+async function gcodeToGx(file) {
+  const start = performance.now();
+  const text  = await file.text();
+  // parse metadata
+  const printTimeSec  = parsePrintTime(text) || Extract.getPrintTime(text);
+  const filamentMm    = parseFilament(text) || Extract.getFilamentUsageMm(text);
+  const layerMicrons  = parseLayerHeightMicrons(text);
+  const nozzleTemp    = Extract.getNozzleTemp(text);
+  const bedTemp       = Extract.getBedTemp(text);
+  const shells        = 3;
+  const printSpeed    = 60;
+  // extract thumbnail or fall back to gradient
+  let bmp = await extractThumbnailBMP(text);
+  if (!bmp) bmp = makeBMP(120, 40);
+  // build header
+  const header = buildGxHeader(
+    { printTimeSec, filamentMm, layerMicrons, shells, printSpeed, bedTemp, nozzleTemp },
+    bmp
+  );
+  // combine header and raw gcode
+  const gcodeBytes = new TextEncoder().encode(text);
+  const result     = new Uint8Array(header.length + gcodeBytes.length);
+  result.set(header, 0);
+  result.set(gcodeBytes, header.length);
+  const elapsedMs  = Math.round(performance.now() - start);
+  return { bytes: result, elapsedMs };
+}
+
+
+
 
 /********************** UI wiring **********************/
 const drop = document.getElementById('drop');
